@@ -1,0 +1,24 @@
+{
+  "name": "site-template",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^15.5.15",
+    "postgres": "^3.4.9",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "resend": "^6.12.2",
+    "tailwindcss": "^4.1.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.4",
+    "@types/node": "25.6.0",
+    "@types/react": "19.2.14",
+    "typescript": "6.0.3"
+  }
+}

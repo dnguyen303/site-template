@@ -1,0 +1,3 @@
+vethauljunkremoval.com, www.vethauljunkremoval.com {
+    reverse_proxy app:3000
+}
