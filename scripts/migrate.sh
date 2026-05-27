@@ -1,17 +1,16 @@
 #!/bin/bash
 set -e
 
-ENV_FILE=/opt/vethaul/.env.production
+SITE_DIR=/opt/SITE_NAME   # replace with e.g. /opt/spa-site
+ENV_FILE="${SITE_DIR}/.env.production"
 DB_URL=$(grep '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2-)
 
 log() { echo "[migrate] $1"; }
 
-# Run psql against the shared Postgres container using the site's own credentials
 run_psql() {
     docker exec infra-postgres psql "$DB_URL" "$@"
 }
 
-# Create migration tracking table if it doesn't exist
 run_psql -c "
   CREATE TABLE IF NOT EXISTS schema_migrations (
     filename TEXT PRIMARY KEY,
@@ -19,10 +18,9 @@ run_psql -c "
   );
 " > /dev/null
 
-for filepath in /opt/vethaul/db/migrations/*.sql; do
+for filepath in "${SITE_DIR}/db/migrations/"*.sql; do
   filename=$(basename "$filepath")
   already_applied=$(run_psql -tAc "SELECT COUNT(*) FROM schema_migrations WHERE filename='$filename';")
-
   if [ "$already_applied" = "0" ]; then
     log "Applying $filename..."
     run_psql -f /dev/stdin < "$filepath"
