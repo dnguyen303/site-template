@@ -1,14 +1,17 @@
 #!/bin/bash
 set -e
 
-SITE_DIR=/opt/SITE_NAME   # replace with e.g. /opt/spa-site
+HERE=$(cd "$(dirname "$0")" && pwd)
+source "$HERE/../deploy/site.env"
+
+SITE_DIR="/opt/${SITE_NAME}"
 ENV_FILE="${SITE_DIR}/.env.production"
 DB_URL=$(grep '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2-)
 
 log() { echo "[migrate] $1"; }
 
 run_psql() {
-    docker exec infra-postgres psql "$DB_URL" "$@"
+    docker exec "$PG_CONTAINER" psql "$DB_URL" "$@"
 }
 
 run_psql -c "

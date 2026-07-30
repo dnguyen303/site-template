@@ -1,13 +1,17 @@
 #!/bin/bash
 set -e
 
-COMPOSE="docker compose -f /opt/vethaul/docker-compose.prod.yml --env-file /opt/vethaul/.env.production"
-ENV_FILE=/opt/vethaul/.env.production
-DB_USER=$(grep '^POSTGRES_USER=' "$ENV_FILE" | cut -d= -f2)
-BACKUP_DIR=/opt/vethaul/backups
-REMOTE="gdrive:vethaul-backups"
+# Dumps this site's DB from the shared Postgres container using DATABASE_URL.
+HERE=$(cd "$(dirname "$0")" && pwd)
+source "$HERE/../deploy/site.env"
+
+SITE_DIR="/opt/${SITE_NAME}"
+ENV_FILE="${SITE_DIR}/.env.production"
+DB_URL=$(grep '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2-)
+BACKUP_DIR="${SITE_DIR}/backups"
+REMOTE="gdrive:${SITE_NAME}-backups"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-FILENAME="vethaul-$TIMESTAMP.sql.gz"
+FILENAME="${SITE_NAME}-$TIMESTAMP.sql.gz"
 RETAIN_DAYS=30
 
 log() { echo "[backup] $1"; }
@@ -15,7 +19,7 @@ log() { echo "[backup] $1"; }
 mkdir -p "$BACKUP_DIR"
 
 log "Dumping database..."
-$COMPOSE exec -T db pg_dump -U "$DB_USER" vethaul | gzip > "$BACKUP_DIR/$FILENAME"
+docker exec "$PG_CONTAINER" pg_dump "$DB_URL" | gzip > "$BACKUP_DIR/$FILENAME"
 
 log "Uploading $FILENAME to Google Drive..."
 rclone copy "$BACKUP_DIR/$FILENAME" "$REMOTE"

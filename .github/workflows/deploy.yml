@@ -1,5 +1,9 @@
 name: Deploy to Production
 
+# Set repo variables SITE_NAME and SITE_DOMAIN (Settings > Secrets and variables
+# > Actions > Variables), and secrets VPS_HOST and VPS_SSH_KEY. No per-repo edits
+# to this file are needed.
+
 on:
   push:
     branches: [main]
@@ -16,11 +20,11 @@ jobs:
           username: root
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd /opt/SITE_NAME
+            cd /opt/${{ vars.SITE_NAME }}
             git pull origin main
-            bash /opt/SITE_NAME/scripts/update.sh
+            bash /opt/${{ vars.SITE_NAME }}/scripts/update.sh
 
       - name: Post-deploy health check
         run: |
           sleep 5
-          curl --fail --silent https://SITE_DOMAIN/api/health | grep '"ok":true'
+          curl --fail --silent https://${{ vars.SITE_DOMAIN }}/api/health | grep '"ok":true'
