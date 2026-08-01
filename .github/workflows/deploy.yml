@@ -8,6 +8,10 @@ name: Deploy to Production
 on:
   push:
     branches: [main]
+    # Docs-only changes shouldn't rebuild/redeploy (and restart a live container).
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
 
 # Never let two deploys build/pull on the shared VPS at the same time.
 concurrency:
