@@ -6,6 +6,12 @@ on a docker network), and each site is a container that joins it. All
 environment-specific values live in `deploy/site.env`, so the scripts have no
 placeholders to edit.
 
+**Images are built in CI, not on the VPS.** The deploy workflow builds the Docker
+image on GitHub's runners, pushes it to GHCR (`ghcr.io/<owner>/<repo>`), and the
+VPS only pulls and runs it. This keeps build CPU/RAM off the shared box, which is
+essential when several sites share a small (2 GB) VPS. It also gives atomic
+deploys and easy rollback (each image is tagged with the commit SHA).
+
 ## One-time setup for a new site
 
 1. **Create the repo** from this template and clone it locally.
@@ -31,7 +37,33 @@ placeholders to edit.
    route (idempotent), and writes `.env.production` with the real `DATABASE_URL`.
    Fill in any remaining app secrets it lists (Resend, Airtable, etc.).
 6. **Point DNS** at the VPS: `A @` and `A www` -> VPS IP, DNS-only.
-7. **Merge to `main`.** The deploy Action pulls, migrates, builds, and health-checks.
+7. **Merge to `main`.** The workflow builds + pushes the image, then the VPS
+   pulls, migrates, and health-checks. (The VPS logs in to GHCR with a token
+   passed by the Action, so no manual `docker login` is needed.)
+
+## Running several sites on a small (2 GB) VPS
+
+This stack is tuned to fit multiple Next.js sites plus Postgres and Caddy in ~2 GB:
+
+- **Builds run in CI, not on the box** (see above). On-VPS builds are the main
+  cause of OOM on a small box; moving them off is the biggest win.
+- **Add swap** (one-time, per VPS). A 2 GB swap file is cheap insurance against
+  OOM spikes:
+  ```
+  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  sysctl -w vm.swappiness=10 && echo 'vm.swappiness=10' >> /etc/sysctl.conf
+  ```
+- **Bounded Node heap.** `NODE_OPTIONS=--max-old-space-size=256` in
+  `docker-compose.prod.yml` stops Node from sizing its heap to host RAM.
+- **Container memory + log limits.** `mem_limit: 400m` per app and rotated
+  json-file logs (10m x 3) are set in the compose file.
+- **Small DB pool.** `lib/db.ts` uses `max: 3` connections with a 20s idle
+  timeout, so N sites don't exhaust the shared Postgres.
+- **Deploys are serialized** (`concurrency` in the workflow) and recreate the
+  container in place (no memory-doubling blue/green).
+- **Reclaim disk periodically:** `docker image prune -f` on a weekly cron.
+- Tune the shared Postgres for a small box in `vethaul-infra` (modest
+  `shared_buffers` and `max_connections`).
 
 ## Deploying on a DIFFERENT VPS
 
@@ -51,6 +83,6 @@ running the infra.
 
 - `deploy/site.env` — per-site + infra config (committed, non-secret)
 - `deploy/provision-site.sh` — one-shot VPS provisioning (run once after clone)
-- `scripts/update.sh` — build + swap + health-check + rollback (run by the Action)
+- `scripts/update.sh` — pull image + migrate + swap + health-check + rollback (run by the Action)
 - `scripts/migrate.sh` — idempotent SQL migrations
 - `scripts/backup.sh` — DB dump to Google Drive via rclone
